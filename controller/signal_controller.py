@@ -46,17 +46,21 @@ class SignalController:
             time.sleep(duration)
 
         try:
-            # Phase 1: North/South Green
-            run_phase(SignalState.GREEN, SignalState.GREEN, SignalState.RED, SignalState.RED, green_time, "Phase 1: N/S Green")
+            # Phase 1: North Only
+            run_phase(SignalState.GREEN, SignalState.RED, SignalState.RED, SignalState.RED, green_time, "Phase 1: NORTH Go")
+            run_phase(SignalState.YELLOW, SignalState.RED, SignalState.RED, SignalState.RED, yellow_time, "NORTH Stopping")
             
-            # Phase 2: North/South Yellow
-            run_phase(SignalState.YELLOW, SignalState.YELLOW, SignalState.RED, SignalState.RED, yellow_time, "Phase 2: N/S Yellow")
+            # Phase 2: East Only
+            run_phase(SignalState.RED, SignalState.RED, SignalState.GREEN, SignalState.RED, green_time, "Phase 2: EAST Go")
+            run_phase(SignalState.RED, SignalState.RED, SignalState.YELLOW, SignalState.RED, yellow_time, "EAST Stopping")
             
-            # Phase 3: East/West Green
-            run_phase(SignalState.RED, SignalState.RED, SignalState.GREEN, SignalState.GREEN, green_time, "Phase 3: E/W Green")
+            # Phase 3: South Only
+            run_phase(SignalState.RED, SignalState.GREEN, SignalState.RED, SignalState.RED, green_time, "Phase 3: SOUTH Go")
+            run_phase(SignalState.RED, SignalState.YELLOW, SignalState.RED, SignalState.RED, yellow_time, "SOUTH Stopping")
             
-            # Phase 4: East/West Yellow
-            run_phase(SignalState.RED, SignalState.RED, SignalState.YELLOW, SignalState.YELLOW, yellow_time, "Phase 4: E/W Yellow")
+            # Phase 4: West Only
+            run_phase(SignalState.RED, SignalState.RED, SignalState.RED, SignalState.GREEN, green_time, "Phase 4: WEST Go")
+            run_phase(SignalState.RED, SignalState.RED, SignalState.RED, SignalState.YELLOW, yellow_time, "WEST Stopping")
             
             self.output.display("--- Cycle Complete ---\n")
         except KeyboardInterrupt:
