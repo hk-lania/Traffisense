@@ -82,50 +82,68 @@ class SignalController:
     def run_adaptive_cycle(self, densities: dict):
         """
         Runs a cycle where timings are dynamically adjusted based on the input densities.
+        Prioritizes the direction with the highest density (most cars) to go first.
         `densities` should be a dict mapping Direction to an integer car count.
         """
-        self.output.display("\n🧠 ADAPTIVE ALGORITHM TRIGGERED")
-        self.output.display(f"Input Data Received: North={densities.get(Direction.NORTH, 0)} cars, "
-                            f"East={densities.get(Direction.EAST, 0)} cars, "
-                            f"South={densities.get(Direction.SOUTH, 0)} cars, "
-                            f"West={densities.get(Direction.WEST, 0)} cars")
-
-        # Calculate timings
-        t_north = self.calculate_green_time(densities.get(Direction.NORTH, 0))
-        t_east = self.calculate_green_time(densities.get(Direction.EAST, 0))
-        t_south = self.calculate_green_time(densities.get(Direction.SOUTH, 0))
-        t_west = self.calculate_green_time(densities.get(Direction.WEST, 0))
+        self.output.display("\n🧠 ADAPTIVE ALGORITHM TRIGGERED (PRIORITY ROUTING)")
         
-        self.output.display(f"Calculated Green Times -> N:{t_north}s, E:{t_east}s, S:{t_south}s, W:{t_west}s\n")
+        # Ensure all directions have a default count of 0 if not provided
+        all_dirs = {d: densities.get(d, 0) for d in Direction}
         
+        # Sort directions based on car count (highest first)
+        sorted_dirs = sorted(all_dirs.items(), key=lambda item: item[1], reverse=True)
+        
+        self.output.display("Traffic Density Priority Queue:")
+        for idx, (direction, count) in enumerate(sorted_dirs):
+            green_time = self.calculate_green_time(count)
+            self.output.display(f"  {idx+1}. {direction.name} ({count} cars) -> Gets {green_time}s Green Time")
+            
         self.running = True
         yellow_time = 3
 
-        def run_phase(n: SignalState, s: SignalState, e: SignalState, w: SignalState, duration: int, phase_name: str):
+        def run_single_direction_phase(active_dir: Direction, duration: int):
             if not self.running: return
-            self.output.display(f"--- Starting {phase_name} ({duration}s) ---")
-            self.phase_manager.set_phase(n, s, e, w)
+            
+            self.output.display(f"\n--- Starting {active_dir.name} Go Phase ({duration}s) ---")
+            
+            # Setup states: Green for active direction, Red for all others
+            states = {d: SignalState.RED for d in Direction}
+            states[active_dir] = SignalState.GREEN
+            
+            self.phase_manager.set_phase(
+                states[Direction.NORTH], 
+                states[Direction.SOUTH], 
+                states[Direction.EAST], 
+                states[Direction.WEST]
+            )
             self.display_signals()
             time.sleep(duration)
+            
+            if not self.running: return
+            
+            self.output.display(f"\n--- {active_dir.name} Stopping Phase ({yellow_time}s) ---")
+            
+            # Setup states: Yellow for active direction, Red for all others
+            states[active_dir] = SignalState.YELLOW
+            
+            self.phase_manager.set_phase(
+                states[Direction.NORTH], 
+                states[Direction.SOUTH], 
+                states[Direction.EAST], 
+                states[Direction.WEST]
+            )
+            self.display_signals()
+            time.sleep(yellow_time)
 
         try:
-            # Phase 1: North Only
-            run_phase(SignalState.GREEN, SignalState.RED, SignalState.RED, SignalState.RED, t_north, "Phase 1: NORTH Go")
-            run_phase(SignalState.YELLOW, SignalState.RED, SignalState.RED, SignalState.RED, yellow_time, "NORTH Stopping")
-            
-            # Phase 2: East Only
-            run_phase(SignalState.RED, SignalState.RED, SignalState.GREEN, SignalState.RED, t_east, "Phase 2: EAST Go")
-            run_phase(SignalState.RED, SignalState.RED, SignalState.YELLOW, SignalState.RED, yellow_time, "EAST Stopping")
-            
-            # Phase 3: South Only
-            run_phase(SignalState.RED, SignalState.GREEN, SignalState.RED, SignalState.RED, t_south, "Phase 3: SOUTH Go")
-            run_phase(SignalState.RED, SignalState.YELLOW, SignalState.RED, SignalState.RED, yellow_time, "SOUTH Stopping")
-            
-            # Phase 4: West Only
-            run_phase(SignalState.RED, SignalState.RED, SignalState.RED, SignalState.GREEN, t_west, "Phase 4: WEST Go")
-            run_phase(SignalState.RED, SignalState.RED, SignalState.RED, SignalState.YELLOW, yellow_time, "WEST Stopping")
-            
-            self.output.display("--- Adaptive Cycle Complete ---\n")
+            # Execute phases in the priority order we just sorted
+            for direction, car_count in sorted_dirs:
+                if not self.running:
+                    break
+                calculated_green = self.calculate_green_time(car_count)
+                run_single_direction_phase(direction, calculated_green)
+                
+            self.output.display("--- Adaptive Priority Cycle Complete ---\n")
         except KeyboardInterrupt:
             self.output.display("\nCycle interrupted by user.")
         finally:
