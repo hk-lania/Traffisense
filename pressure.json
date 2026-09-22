@@ -1,0 +1,22 @@
+{
+  "weights": {
+    "queue": 0.3,
+    "waiting": 0.3,
+    "count": 0.25,
+    "density": 0.15,
+    "flow": 0.0
+  },
+  "caps": {
+    "count": 25.0,
+    "queue_m": 80.0,
+    "waiting_s": 60.0,
+    "density_pct": 100.0,
+    "flow": 10.0
+  },
+  "normalisation": "linear",
+  "invert_flow": true,
+  "apply_camera_confidence": true,
+  "confidence_floor": 0.3,
+  "scale": 100.0,
+  "version": "provisional-0.1"
+}
