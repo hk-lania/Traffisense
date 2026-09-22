@@ -31,6 +31,10 @@ class SignalController:
         dashboard.append("==========================================\n")
         
         self.output.display("\n".join(dashboard))
+        
+        # If the output is the ESP32 hardware interface, transmit the actual LED states!
+        if hasattr(self.output, 'transmit_hardware_state'):
+            self.output.transmit_hardware_state(self.phase_manager)
 
     def run_cycle(self, green_time: int = 10, yellow_time: int = 3):
         """
@@ -153,7 +157,7 @@ class SignalController:
         """
         Immediately sets all signals to RED and displays an emergency alert.
         """
-        self.running = False # Stop any running cycle if this was threaded (it's synchronous here, but good practice)
+        self.running = False
         self.phase_manager.reset_all()
         
         alert = "\n🚨 EMERGENCY STOP ACTIVATED 🚨\nAll signals set to RED for safety."
@@ -169,3 +173,53 @@ class SignalController:
         self.output.display("(Software fallback if adaptive timing is unavailable)")
         
         self.run_cycle(green_time=30, yellow_time=3)
+
+    def set_signal(self, direction_name: str, green_time: int):
+        """
+        Directly commands a specific direction to go GREEN for a set time, 
+        then transitions to YELLOW, while keeping all others RED.
+        This provides the exact simple interface requested by the AI/Integration team.
+        """
+        self.running = True
+        
+        # Convert the string (e.g. "NORTH") into our Direction Enum
+        try:
+            active_dir = Direction[direction_name.upper()]
+        except KeyError:
+            self.output.display(f"Error: '{direction_name}' is not a valid direction.")
+            return
+
+        yellow_time = 3
+        self.output.display(f"\n--- [API COMMAND] {active_dir.name} Go Phase ({green_time}s) ---")
+        
+        # Setup states: Green for active direction, Red for all others
+        states = {d: SignalState.RED for d in Direction}
+        states[active_dir] = SignalState.GREEN
+        
+        self.phase_manager.set_phase(
+            states[Direction.NORTH], 
+            states[Direction.SOUTH], 
+            states[Direction.EAST], 
+            states[Direction.WEST]
+        )
+        self.display_signals()
+        time.sleep(green_time)
+        
+        if not self.running: return
+        
+        self.output.display(f"\n--- [API COMMAND] {active_dir.name} Stopping Phase ({yellow_time}s) ---")
+        states[active_dir] = SignalState.YELLOW
+        self.phase_manager.set_phase(
+            states[Direction.NORTH], 
+            states[Direction.SOUTH], 
+            states[Direction.EAST], 
+            states[Direction.WEST]
+        )
+        self.display_signals()
+        time.sleep(yellow_time)
+        
+        # Ensure it safely returns to all Red after the command finishes
+        self.phase_manager.reset_all()
+        self.display_signals()
+        self.running = False
+
