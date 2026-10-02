@@ -39,7 +39,7 @@ VIDEO_PATH = os.path.join(
 # YOLO MODEL
 # =====================================================
 
-YOLO_MODEL_NAME = "yolov8n.pt"
+YOLO_MODEL_NAME = "riddhi_yolov8n.pt"
 
 YOLO_MODEL_PATH = os.path.join(
     WEIGHTS_DIR,

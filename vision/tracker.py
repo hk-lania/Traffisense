@@ -42,8 +42,6 @@ class Tracker:
 
             iou=IOU_THRESHOLD,
 
-            classes=[0, 1, 2, 3, 5, 7],
-
             imgsz=960,
 
             device=self.device,
