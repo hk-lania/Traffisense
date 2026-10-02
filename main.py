@@ -56,7 +56,7 @@ def draw_dashboard(frame, snapshot: dict, fps: float, current_green: str):
     cv2.putText(frame, "TraffiSense AI Dashboard", (20, 35), font, 0.75, (0, 255, 255), 2)
 
     total_vehicles = sum(m.vehicle_count for m in snapshot.values())
-    total_queued = sum(m.queue.queued_vehicles for m in snapshot.values())
+    total_queued = sum(m.queue.queued_count for m in snapshot.values())
     max_pressure_name = max(snapshot.items(), key=lambda x: x[1].pressure.pressure)[0]
     max_p_val = snapshot[max_pressure_name].pressure.pressure
 
@@ -71,16 +71,17 @@ def draw_dashboard(frame, snapshot: dict, fps: float, current_green: str):
     y = 70
     spacing = 30
     for label, value in items:
-        color = (0, 255, 0) if "Signal Status" in label and "yellow" not in value.lower() else (255, 255, 255)
-        if "yellow" in value.lower(): color = (0, 255, 255)
-        if "red" in value.lower(): color = (0, 0, 255)
+        val_str = str(value).lower()
+        color = (0, 255, 0) if "Signal Status" in label and "yellow" not in val_str else (255, 255, 255)
+        if "yellow" in val_str: color = (0, 255, 255)
+        if "red" in val_str: color = (0, 0, 255)
         cv2.putText(frame, f"{label} : {value}", (20, y), font, 0.60, color, 2)
         y += spacing
 
     cv2.putText(frame, "Approaches:", (20, y), font, 0.55, (0, 255, 255), 1)
     y += 20
     for name, m in snapshot.items():
-        text = f"{name[0].upper()}: Cnt={m.vehicle_count} Q={m.queue.queued_vehicles} P={m.pressure.pressure:.0f}"
+        text = f"{name[0].upper()}: Cnt={m.vehicle_count} Q={m.queue.queued_count} P={m.pressure.pressure:.0f}"
         cv2.putText(frame, text, (20, y), font, 0.50, (200, 200, 200), 1)
         y += 20
 

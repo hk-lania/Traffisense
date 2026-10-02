@@ -27,3 +27,5 @@ class Vehicle:
     frame_number: int
 
     timestamp: float
+
+    lane: str = None
