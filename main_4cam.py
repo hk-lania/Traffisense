@@ -105,6 +105,7 @@ def main():
     parser.add_argument("--config", type=str, default=None)
     parser.add_argument("--save", type=str, default=None, help="Save output video to path (e.g. out.avi)")
     parser.add_argument("--max-frames", type=int, default=0, help="Stop after N frames")
+    parser.add_argument("--port", type=str, default=None, help="COM port for ESP32 hardware (e.g., COM3 or /dev/ttyUSB0)")
     args = parser.parse_args()
 
     sources = {
@@ -135,7 +136,7 @@ def main():
     
     # auto_lane=False because we are explicitly setting `vehicle.lane = direction` for each camera!
     engine = TrafficMetricsEngine(intersection, pressure_config=config, auto_lane=False)
-    adapter = SignalAdapter(min_green=5.0, max_green=30.0)
+    adapter = SignalAdapter(min_green=5.0, max_green=30.0, com_port=args.port)
 
     frame_number = 0
     previous_time = time.time()

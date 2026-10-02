@@ -101,7 +101,7 @@ def run_real_video(source: str, engine: TrafficMetricsEngine, args: argparse.Nam
 
     tracker = Tracker()
     density_estimator = DensityMap()
-    adapter = SignalAdapter(min_green=5.0, max_green=30.0)
+    adapter = SignalAdapter(min_green=5.0, max_green=30.0, com_port=getattr(args, 'port', None))
 
     log: list[dict] = []
     frame_number = 0
@@ -163,12 +163,13 @@ def main() -> None:
     parser.add_argument("--report-every", type=float, default=5.0)
     parser.add_argument("--config", type=str, default=None)
     parser.add_argument("--json", type=str, default=None)
+    parser.add_argument("--port", type=str, default=None, help="COM port for ESP32 hardware (e.g., COM3)")
     args = parser.parse_args()
 
     intersection = rectangular_intersection()
     config = PressureConfig.load(args.config) if args.config else PressureConfig()
     engine = TrafficMetricsEngine(intersection, pressure_config=config)
-    adapter = SignalAdapter(min_green=5.0, max_green=30.0)
+    adapter = SignalAdapter(min_green=5.0, max_green=30.0, com_port=args.port)
 
     print("========== TraffiSense ==========")
     print("  approaches :", ", ".join(intersection.names))

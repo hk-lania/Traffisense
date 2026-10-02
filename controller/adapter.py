@@ -22,7 +22,21 @@ class SignalAdapter:
         "west": Direction.WEST
     }
     
-    def __init__(self, min_green: float = 10.0, max_green: float = 60.0, yellow_time: float = 3.0, all_red_time: float = 2.0):
+    def __init__(self, min_green: float = 10.0, max_green: float = 60.0, yellow_time: float = 3.0, all_red_time: float = 2.0, com_port: str = None):
+        self.min_green = min_green
+        self.max_green = max_green
+        self.yellow_time = yellow_time
+        self.all_red_time = all_red_time
+        
+        import serial
+        self.com_port = com_port
+        self.serial = None
+        if self.com_port:
+            try:
+                self.serial = serial.Serial(self.com_port, 115200, timeout=1)
+                print(f"[Hardware] Connected to ESP32 on {self.com_port}")
+            except Exception as e:
+                print(f"[Hardware] Warning: Could not connect to ESP32 on {self.com_port}. Error: {e}")
         self.controller = SignalController()
         
         # Timing configurations
@@ -103,7 +117,7 @@ class SignalAdapter:
         self.current_approach = self.cycle_order[self.cycle_index]
         
     def _apply_hardware_state(self):
-        """Translates the adapter's state machine into HK's 4-way signal states."""
+        """Translates the adapter's state machine into HK's 4-way signal states and sends USB commands."""
         states = {
             Direction.NORTH: SignalState.RED,
             Direction.EAST: SignalState.RED,
@@ -111,12 +125,22 @@ class SignalAdapter:
             Direction.WEST: SignalState.RED,
         }
         
+        cmd = b'A' # Default to All Red
+        
         if self.state != "ALL_RED":
             active_dir = self.STR_TO_DIR[self.current_approach]
             if self.state == "GREEN":
                 states[active_dir] = SignalState.GREEN
+                if self.current_approach == "north": cmd = b'N'
+                elif self.current_approach == "east": cmd = b'E'
+                elif self.current_approach == "south": cmd = b'S'
+                elif self.current_approach == "west": cmd = b'W'
             elif self.state == "YELLOW":
                 states[active_dir] = SignalState.YELLOW
+                if self.current_approach == "north": cmd = b'n'
+                elif self.current_approach == "east": cmd = b'e'
+                elif self.current_approach == "south": cmd = b's'
+                elif self.current_approach == "west": cmd = b'w'
                 
         self.controller.phase_manager.set_phase(
             states[Direction.NORTH],
@@ -124,6 +148,12 @@ class SignalAdapter:
             states[Direction.EAST],
             states[Direction.WEST]
         )
+        
+        if self.serial:
+            try:
+                self.serial.write(cmd)
+            except Exception as e:
+                print(f"[Hardware] Serial write failed: {e}")
         
         # Optional: Print HK's dashboard if you want full terminal UI
         # self.controller.display_signals()
