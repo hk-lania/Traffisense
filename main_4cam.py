@@ -103,6 +103,8 @@ def main():
     parser.add_argument("--south", type=str, help="Video for South approach")
     parser.add_argument("--west", type=str, help="Video for West approach")
     parser.add_argument("--config", type=str, default=None)
+    parser.add_argument("--save", type=str, default=None, help="Save output video to path (e.g. out.avi)")
+    parser.add_argument("--max-frames", type=int, default=0, help="Stop after N frames")
     args = parser.parse_args()
 
     sources = {
@@ -138,6 +140,12 @@ def main():
     frame_number = 0
     previous_time = time.time()
     video_start_time = time.time()
+
+    out_writer = None
+    if args.save:
+        fourcc = cv2.VideoWriter_fourcc(*'XVID')
+        # Grid is 2x2 of 640x360 frames = 1280x720
+        out_writer = cv2.VideoWriter(args.save, fourcc, 25.0, (1280, 720))
 
     print("\nStarting 4-Camera Multi-Tracking stream. Press 'q' to quit.")
     
@@ -198,10 +206,22 @@ def main():
         previous_time = current_time
         draw_dashboard(grid, snapshot, fps, current_green)
         
-        cv2.imshow("TraffiSense 4-Cam AI Pipeline", grid)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if out_writer is not None:
+            out_writer.write(grid)
+            
+        try:
+            cv2.imshow("TraffiSense 4-Cam AI Pipeline", grid)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        except Exception:
+            pass # Ignore if running headlessly without GUI support
+            
+        if args.max_frames > 0 and frame_number >= args.max_frames:
+            print(f"Reached max frames ({args.max_frames}). Stopping.")
             break
 
+    if out_writer is not None:
+        out_writer.release()
     cv2.destroyAllWindows()
 
 
