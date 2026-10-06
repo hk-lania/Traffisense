@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Riddhi's TraffiSense YOLO Module
 
 This module contains the complete local YOLOv8 pipeline for the TraffiSense project. 
@@ -16,7 +15,7 @@ It transitions our system from using a cloud API to a fully local model (`models
 To use this module in the main pipeline:
 ```python
 import cv2
-from inference import detect
+from riddhi_detection.inference import detect   # from the project root
 
 frame = cv2.imread("traffic.jpg")
 detections = detect(frame)
@@ -31,6 +30,7 @@ detections = detect(frame)
 #   }
 # ]
 ```
-=======
-# IPD
->>>>>>> d61817337fd184d0c4a2aaaf3874c0dbdb103510
+
+If `models/best.pt` is not present (it is git-ignored because of its size), `inference.py`
+falls back to the pretrained `yolov8n.pt` in this folder and prints a warning.
+Share `best.pt` with the team (Google Drive / GitHub Releases) and drop it into `models/`.

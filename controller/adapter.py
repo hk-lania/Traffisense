@@ -28,11 +28,11 @@ class SignalAdapter:
         self.yellow_time = yellow_time
         self.all_red_time = all_red_time
         
-        import serial
         self.com_port = com_port
         self.serial = None
         if self.com_port:
             try:
+                import serial  # pyserial - only needed when an ESP32 port is given
                 self.serial = serial.Serial(self.com_port, 115200, timeout=1)
                 print(f"[Hardware] Connected to ESP32 on {self.com_port}")
             except Exception as e:
