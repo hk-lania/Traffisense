@@ -5,7 +5,9 @@ Runs the complete TraffiSense pipeline end-to-end.
 
 Modes:
   1. Real Video Pipeline (Hitarth's Vision + Tanish's Engine):
-     python main.py --source datasets/AICity22_Track1_MTMC_Tracking/validation/S05/c018/vdo.avi
+     python draw_roi.py --video clip.mp4 --out config/intersection.json   # once per camera
+     python main.py --source clip.mp4                                      # uses config/intersection.json
+     python main.py --source clip.mp4 --camera-confidence --optical-flow  # Tanish's vision modules
 
   2. Synthetic Simulator (Tanish's Engine standalone):
      python main.py --seconds 60
@@ -25,11 +27,14 @@ from pathlib import Path
 
 import cv2
 
-from metrics import PressureConfig, TrafficMetricsEngine, rectangular_intersection
+from metrics import (IntersectionROI, PressureConfig, TrafficMetricsEngine,
+                     rectangular_intersection)
 from simulate import IntersectionSimulator
 
 
 from controller.adapter import SignalAdapter
+
+DEFAULT_ROIS = Path(__file__).resolve().parent / "config" / "intersection.json"
 
 HEADER = (f"{'approach':<8}{'count':>7}{'density%':>10}{'queue m':>9}"
           f"{'queued':>8}{'wait s':>8}{'pressure':>10}  level")
@@ -85,7 +90,26 @@ def draw_dashboard(frame, snapshot: dict, fps: float, current_green: str):
         cv2.putText(frame, text, (20, y), font, 0.50, (200, 200, 200), 1)
         y += 20
 
-def run_real_video(source: str, engine: TrafficMetricsEngine, args: argparse.Namespace) -> list[dict]:
+def load_intersection(rois_path: str | None, frame_size: tuple[int, int]):
+    """Road areas + stop lines for THIS camera, drawn with draw_roi.py.
+
+    Without them the metrics fall back to the simulator's made-up junction,
+    which does not match real footage - density, queue and waiting time are
+    then meaningless, so say so loudly."""
+    path = Path(rois_path) if rois_path else DEFAULT_ROIS
+    if path.exists():
+        print(f"  rois       : {path}")
+        return IntersectionROI.load(path)
+    print("\n  !! No ROI file found at", path)
+    print("  !! Using the SIMULATOR's road layout - metrics will NOT match this video.")
+    print("  !! Draw the real one once per camera:")
+    print(f"  !!   python draw_roi.py --video <your video> --out {path}\n")
+    width, height = frame_size
+    return rectangular_intersection(frame_width=width, frame_height=height)
+
+
+def run_real_video(source: str, engine_factory, adapter: SignalAdapter,
+                   args: argparse.Namespace) -> tuple[list[dict], TrafficMetricsEngine]:
     from vision.video_loader import VideoLoader
     from vision.tracker import Tracker
     from vision.vehicle_factory import VehicleFactory
@@ -97,16 +121,25 @@ def run_real_video(source: str, engine: TrafficMetricsEngine, args: argparse.Nam
     info = loader.get_info()
     if info is None:
         print(f"Error: Could not load video from {source}")
-        return []
+        raise SystemExit(1)
+
+    engine = engine_factory(load_intersection(args.rois, info["resolution"]))
+    video_fps = info["fps"] or 25.0
 
     tracker = Tracker()
     density_estimator = DensityMap()
-    adapter = SignalAdapter(min_green=5.0, max_green=30.0, com_port=getattr(args, 'port', None))
+
+    confidence_module = flow_module = None
+    if args.camera_confidence:
+        from vision.camera_confidence import CameraConfidenceEstimator
+        confidence_module = CameraConfidenceEstimator()
+    if args.optical_flow:
+        from vision.optical_flow import OpticalFlowEstimator
+        flow_module = OpticalFlowEstimator()
 
     log: list[dict] = []
     frame_number = 0
     previous_time = time.time()
-    video_start_time = time.time()
 
     print("\nStarting video stream. Press 'q' to quit OpenCV window.")
     while True:
@@ -116,11 +149,17 @@ def run_real_video(source: str, engine: TrafficMetricsEngine, args: argparse.Nam
             
         frame_number += 1
         current_time = time.time()
-        simulated_video_time = current_time - video_start_time
-        
+        # Video time, not wall-clock time: waiting time and speeds must follow
+        # the footage even when YOLO runs slower (or faster) than real time.
+        simulated_video_time = (frame_number - 1) / video_fps
+
         annotated, results = tracker.get_annotated_frame(frame)
         vehicles = VehicleFactory.create(results, frame_number, simulated_video_time)
-        snapshot = engine.update(vehicles, frame=frame_number, timestamp=simulated_video_time)
+
+        confidence = confidence_module.compute(frame)["confidence"] if confidence_module else None
+        flow = flow_module.compute(frame)["average_motion"] if flow_module else None
+        snapshot = engine.update(vehicles, frame=frame_number, timestamp=simulated_video_time,
+                                 camera_confidence=confidence, optical_flow=flow)
         
         # Step the signal adapter with our video timestamp
         current_green = adapter.step(simulated_video_time, snapshot)
@@ -151,7 +190,7 @@ def run_real_video(source: str, engine: TrafficMetricsEngine, args: argparse.Nam
         })
 
     cv2.destroyAllWindows()
-    return log
+    return log, engine
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="TraffiSense end-to-end pipeline")
@@ -164,20 +203,29 @@ def main() -> None:
     parser.add_argument("--config", type=str, default=None)
     parser.add_argument("--json", type=str, default=None)
     parser.add_argument("--port", type=str, default=None, help="COM port for ESP32 hardware (e.g., COM3)")
+    parser.add_argument("--rois", type=str, default=None,
+                        help="ROI file for this camera (default: config/intersection.json)")
+    parser.add_argument("--camera-confidence", action="store_true",
+                        help="scale pressure by vision/camera_confidence.py")
+    parser.add_argument("--optical-flow", action="store_true",
+                        help="record vision/optical_flow.py (weight 0 for now; slow on CPU)")
     args = parser.parse_args()
 
-    intersection = rectangular_intersection()
     config = PressureConfig.load(args.config) if args.config else PressureConfig()
-    engine = TrafficMetricsEngine(intersection, pressure_config=config)
+    # One adapter only: opening the ESP32 serial port twice fails.
     adapter = SignalAdapter(min_green=5.0, max_green=30.0, com_port=args.port)
 
     print("========== TraffiSense ==========")
-    print("  approaches :", ", ".join(intersection.names))
     print("  pressure   :", config.version)
 
     if args.source:
-        log = run_real_video(args.source, engine, args)
+        log, engine = run_real_video(
+            args.source,
+            lambda intersection: TrafficMetricsEngine(intersection, pressure_config=config),
+            adapter, args)
     else:
+        intersection = rectangular_intersection()
+        engine = TrafficMetricsEngine(intersection, pressure_config=config)
         print(f"  source     : SIMULATOR ({args.seconds:.0f} s @ {args.fps:.0f} fps)")
         sim = IntersectionSimulator(intersection, fps=args.fps)
         log = []

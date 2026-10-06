@@ -27,5 +27,5 @@ def test(image_path):
 
 if __name__ == "__main__":
     # Change this path to any traffic image you have
-    image_path = r"C:\Users\Riddhi\Desktop\riddhi_model\test_image.png"
+    image_path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_image.png")
     test(image_path)
