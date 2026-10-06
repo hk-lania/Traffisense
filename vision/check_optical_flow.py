@@ -1,10 +1,17 @@
+"""Visual check - run from the project root:  python vision/check_optical_flow.py <video.mp4>"""
+
 import cv2
 
-from optical_flow import OpticalFlowEstimator
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from vision.optical_flow import OpticalFlowEstimator
 
 
 # Change this to your traffic video path
-VIDEO_PATH = "traffic.mp4"
+VIDEO_PATH = sys.argv[1] if len(sys.argv) > 1 else "traffic.mp4"
 
 
 cap = cv2.VideoCapture(VIDEO_PATH)

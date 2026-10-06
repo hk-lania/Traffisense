@@ -34,7 +34,7 @@ from typing import Any, Iterable, Mapping, Optional
 from .density import DensityEstimator, DensityResult
 from .motion import MotionTracker
 from .pressure import PressureCalculator, PressureConfig, PressureResult
-from .queue import QueueEstimator, QueueResult
+from .queue_length import QueueEstimator, QueueResult
 from .roi import IntersectionROI
 from .schema import Detection, FrameData, as_frame
 from .waiting_time import WaitingTimeResult, WaitingTimeTracker

@@ -1,108 +1,63 @@
-"""
-TraffiSense - main.py
-----------------------
-Runs the Traffic Metrics Module end to end against the synthetic tracker
-stream and prints the per-approach metric block.
+import sys
+from controller.signal_controller import SignalController
+from controller.direction import Direction
 
-    python main.py                     # 60 s of simulated traffic
-    python main.py --seconds 120       # longer run
-    python main.py --json out.json     # also write a per-second metrics log
-    python main.py --explain           # show the pressure breakdown
+def display_menu():
+    print("\n" + "="*30)
+    print("  TRAFFISENSE CONTROLLER  ")
+    print("="*30)
+    print("1. Run Normal Cycle")
+    print("2. Run Adaptive Cycle (Input Density)")
+    print("3. Emergency Stop")
+    print("4. Fixed-Time Mode")
+    print("5. Exit")
+    print("="*30)
 
-Swapping in the real pipeline means replacing ONE loop:
+def main():
+    controller = SignalController()
+    
+    # Initial state display
+    print("\n--- Initializing TraffiSense Controller ---")
+    controller.display_signals()
 
-    for frame_index, timestamp, tracked_vehicles in source:
-        snapshot = engine.update(tracked_vehicles, frame=frame_index,
-                                 timestamp=timestamp)
-
-where `tracked_vehicles` is whatever YOLO + ByteTrack hands over.
-"""
-
-from __future__ import annotations
-
-import argparse
-import json
-from pathlib import Path
-
-from metrics import PressureConfig, TrafficMetricsEngine, rectangular_intersection
-from simulate import IntersectionSimulator
-
-HEADER = (f"{'approach':<8}{'count':>7}{'density%':>10}{'queue m':>9}"
-          f"{'queued':>8}{'wait s':>8}{'pressure':>10}  level")
-
-
-def print_snapshot(timestamp: float, snapshot: dict, green: str) -> None:
-    print(f"\n t = {timestamp:6.1f} s     green: {green}")
-    print(" " + HEADER)
-    print(" " + "-" * len(HEADER))
-    for name, metrics in snapshot.items():
-        row = metrics.to_dict()
-        queue_m = row["queue_length_m"]
-        queue_text = "n/a" if queue_m is None else f"{queue_m:.1f}"
-        print(f" {name:<8}{row['vehicle_count']:>7}"
-              f"{row['density_percent']:>10.1f}{queue_text:>9}"
-              f"{row['queued_vehicles']:>8}{row['waiting_time_s']:>8.1f}"
-              f"{row['pressure']:>10.1f}  {row['pressure_level']}")
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="TraffiSense traffic metrics demo")
-    parser.add_argument("--seconds", type=float, default=60.0)
-    parser.add_argument("--fps", type=float, default=25.0)
-    parser.add_argument("--report-every", type=float, default=5.0,
-                        help="seconds between printed snapshots")
-    parser.add_argument("--config", type=str, default=None,
-                        help="pressure config JSON (see config/pressure.json)")
-    parser.add_argument("--json", type=str, default=None,
-                        help="write a per-report metrics log here")
-    parser.add_argument("--explain", action="store_true",
-                        help="print the pressure breakdown for each approach")
-    parser.add_argument("--camera-confidence", type=float, default=None,
-                        help="0-1 confidence from your camera_confidence module")
-    args = parser.parse_args()
-
-    intersection = rectangular_intersection()
-    config = PressureConfig.load(args.config) if args.config else PressureConfig()
-    engine = TrafficMetricsEngine(intersection, pressure_config=config)
-    sim = IntersectionSimulator(intersection, fps=args.fps)
-
-    print("TraffiSense - Traffic Metrics Module")
-    print(f"  approaches : {', '.join(intersection.names)}")
-    print(f"  pressure   : {config.version}  weights={config.weights}")
-    print(f"  source     : simulated tracker output "
-          f"({args.seconds:.0f} s @ {args.fps:.0f} fps)")
-
-    log: list[dict] = []
-    report_interval = max(1, int(args.report_every * args.fps))
-
-    for frame_index, timestamp, detections in sim.run(args.seconds):
-        snapshot = engine.update(
-            detections, frame=frame_index, timestamp=timestamp,
-            camera_confidence=args.camera_confidence,
-        )
-
-        if frame_index % report_interval == 0:
-            print_snapshot(timestamp, snapshot, sim.green_approach)
-            if args.explain:
-                print()
-                for metrics in snapshot.values():
-                    print(metrics.pressure.explain())
-            log.append({
-                "frame": frame_index,
-                "timestamp": round(timestamp, 2),
-                "green": sim.green_approach,
-                "approaches": {n: m.to_dict() for n, m in snapshot.items()},
-            })
-
-    ranking = engine.pressure_ranking()
-    print("\nFinal pressure ranking (input for the future signal controller):")
-    for position, (name, pressure) in enumerate(ranking, start=1):
-        print(f"  {position}. {name:<6} {pressure:6.1f}")
-
-    if args.json:
-        Path(args.json).write_text(json.dumps(log, indent=2))
-        print(f"\nWrote {len(log)} snapshots to {args.json}")
-
+    while True:
+        display_menu()
+        choice = input("Select an option (1-5): ").strip()
+        
+        if choice == '1':
+            print("\nStarting Normal Cycle (10s Green, 3s Yellow)...")
+            controller.run_cycle(green_time=10, yellow_time=3)
+        elif choice == '2':
+            print("\n--- Simulate AI Input (Car Density) ---")
+            try:
+                n_cars = int(input("Enter number of cars in NORTH: "))
+                e_cars = int(input("Enter number of cars in EAST: "))
+                s_cars = int(input("Enter number of cars in SOUTH: "))
+                w_cars = int(input("Enter number of cars in WEST: "))
+                
+                fake_ai_input = {
+                    Direction.NORTH: n_cars,
+                    Direction.EAST: e_cars,
+                    Direction.SOUTH: s_cars,
+                    Direction.WEST: w_cars
+                }
+                
+                controller.run_adaptive_cycle(fake_ai_input)
+            except ValueError:
+                print("Invalid input. Please enter numbers only.")
+        elif choice == '3':
+            controller.emergency_stop()
+        elif choice == '4':
+            controller.fixed_time_mode()
+        elif choice == '5':
+            print("\nShutting down TraffiSense Controller...")
+            sys.exit(0)
+        else:
+            print("\nInvalid choice. Please enter a number between 1 and 5.")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n\nForced shutdown. Exiting...")
+        sys.exit(0)

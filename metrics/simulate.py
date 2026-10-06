@@ -1,5 +1,5 @@
 """
-TraffiSense - simulate.py
+TraffiSense - metrics/simulate.py
 --------------------------
 A synthetic tracked-vehicle stream, so the metrics modules can be developed,
 tested and demonstrated before the detection side is wired up.

@@ -36,7 +36,7 @@ import cv2
 import numpy as np
 
 from metrics import rectangular_intersection
-from simulate import IntersectionSimulator
+from metrics.simulate import IntersectionSimulator
 
 ROAD = (58, 58, 58)
 GRASS = (38, 52, 38)

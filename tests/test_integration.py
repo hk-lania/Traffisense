@@ -16,7 +16,7 @@ import unittest
 
 from metrics import (PressureConfig, TrafficMetricsEngine,
                      rectangular_intersection)
-from simulate import IntersectionSimulator
+from metrics.simulate import IntersectionSimulator
 
 SECONDS = 120.0
 FPS = 25.0

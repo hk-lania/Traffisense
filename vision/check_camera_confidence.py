@@ -1,9 +1,16 @@
+"""Visual check - run from the project root:  python vision/check_camera_confidence.py <video.mp4>"""
+
 import cv2
 
-from camera_confidence import CameraConfidenceEstimator
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from vision.camera_confidence import CameraConfidenceEstimator
 
 
-VIDEO_PATH = "traffic.mp4"
+VIDEO_PATH = sys.argv[1] if len(sys.argv) > 1 else "traffic.mp4"
 
 cap = cv2.VideoCapture(VIDEO_PATH)
 

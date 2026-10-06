@@ -11,7 +11,7 @@ The scale is 10 px/m, so 40 px = 4 m and the default 9 m gap rule becomes
 import unittest
 
 from metrics.motion import MotionTracker, TrackMotion
-from metrics.queue import QueueEstimator
+from metrics.queue_length import QueueEstimator
 from metrics.roi import ApproachROI
 
 PPM = 10.0

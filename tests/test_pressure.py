@@ -180,7 +180,7 @@ class TestInputFlexibility(unittest.TestCase):
 
     def test_accepts_bare_numbers_dicts_and_result_objects(self):
         from metrics.density import DensityResult
-        from metrics.queue import QueueResult
+        from metrics.queue_length import QueueResult
         from metrics.waiting_time import WaitingTimeResult
 
         calc = PressureCalculator()
@@ -200,7 +200,7 @@ class TestInputFlexibility(unittest.TestCase):
         self.assertAlmostEqual(dicts.pressure, objects.pressure, places=6)
 
     def test_uncalibrated_camera_falls_back_to_pixel_queue_ratio(self):
-        from metrics.queue import QueueResult
+        from metrics.queue_length import QueueResult
         calc = PressureCalculator()
         result = calc.compute(
             "north", vehicle_count=0,

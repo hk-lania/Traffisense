@@ -1,0 +1,8 @@
+# TraffiSense - install everything with:  pip install -r requirements.txt
+numpy>=1.23          # metrics, tracker
+opencv-python>=4.8   # video I/O, camera confidence, optical flow, draw_roi
+ultralytics>=8.0     # Riddhi's YOLOv8 detector
+PyYAML>=6.0          # detector config
+pyserial>=3.5        # only needed for the ESP32 output (--esp32)
+
+# Training the detector needs a few more: see riddhi_detection/requirements.txt
